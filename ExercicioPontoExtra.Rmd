@@ -1,0 +1,107 @@
+---
+title: "Método iterativo de Cochrane - Orutt"
+author: "Samuel Martins de Medeiros"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Entradas
+
+O *Dataset* utilizado nesse exercício será o softdrink, lembrando do passo a passo apresentado em sala *Fitaremos* o modelo e aplicaremos os devidos testes de hipótese.
+
+```{r message=FALSE, warning=FALSE}
+x <- c(.97,.95,.99,.91,.98,.90,.89,.86,.85,.82,.79,.83,.81,.77,.76,.80,.83,.79,.76,.78) 
+y <- c(3.63,4.2,3.33,4.54,2.89,4.87,4.9,5.29,6.18,7.2,7.25,6.09,6.8,8.65,8.43,8.29,7.18,7.9,8.45,8.23)
+```
+
+## algoritmo
+
+```{=tex}
+\begin{enumerate}
+  \item Estimação dos betas com base na matriz de variáveis;
+  \item Predição da variável resposta;
+  \item Estimação dos resíduos;
+  \item Estimação do parâmetro p para análise de correlação;
+  \item Sistema de repetição:
+  \begin{itemize}
+    \item inserção dos novos $x_t$ e $y_t$ para modelo;
+    \item Estimação dos betas com base nos $x$ e $y$ acima;
+    \item Estimação das variáveis preditas;
+    \item calculos dos resíduos (diferença entre $y_t$ e $\hat{y_t}$;
+    \item calculo da estatística de teste $d$
+    \item teste de Durbin Watson para correlação;
+    \item Se $d > D_u$ não rejeita a hipótese nula, se $d < D_L$ rejeita a hipótese     nula e caso $ D_L < d < D_u$ o teste é inconclusivo.
+    \item Se não rejeitar hipótese nula acabe o sistema, caso contrário, repita o processo substituindo $p$ por $\sum a_t a_{t-1}/\sum a_t^2$
+    \end{itemize}
+\end{enumerate}
+```
+Aplicando este modelo ao R, podemos comparar o valor obtido após o processo com o anterior, no caso ***bets\_*** e ***bets*** respectivamente
+
+```{r}
+  modelo <- lm(y~x)
+  e <- modelo$residuals
+  aux <- 0
+  for(i in 2:20){
+    aux <- aux + e[i]*e[i-1]
+  }
+  p <- aux/sum(e[-1]^2)
+  cont = 1
+  #Rejeitaremos h0 para p-valor < 0.10
+  while(1){
+       x_ <- NA
+       y_ <- NA
+      for(i in 2:20){
+        x_[i] <- x[i] - p*x[i-1]
+        y_[i] <- y[i] - p*y[i-1] 
+      }
+       x_ <- x_[!is.na(x_)]
+       y_ <- y_[!is.na(y_)]
+     modelo2 <- lm(y_ ~ x_)
+    #5.5
+     a <- modelo2$residuals
+      aux <- 0
+      for (i in 2:20) {
+        aux <- aux + (a[i]*a[i-1])^2
+      }
+      d <- aux/sum(a^2)
+      Test <- DescTools::DurbinWatsonTest(modelo2)
+      if(Test$p.value > .1){
+          break
+      }else{
+        aux <- 0
+        for(i in 2:20) aux <- aux + (a[i] * a[i-1])
+        p = aux/sum(a[-1]^2)
+      }
+  }
+modelo
+modelo2
+
+```
+
+## Plots
+
+Para compreensão da influência da correlação na estimação dos betas, segue gráfico.
+
+```{r}
+par(mfrow = c(1,2))
+plot(y~x,main='Modelo Com Corr')
+abline(modelo)
+plot(y_ ~x_)
+abline(modelo2,main='Modelo Sem Corr')
+
+```
+
+É notavel a diferença entre os interceptos, e uma leve diferença entre os slopes dos modelos. Seguindo para plotagem dos modelos antes e depois do algoritmo respectivamente
+
+```{r}
+par(mfrow = c(2,2))
+plot(modelo)
+```
+
+```{r}
+par(mfrow = c(2,2))
+plot(modelo2)
+```
